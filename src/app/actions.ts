@@ -241,6 +241,28 @@ export async function sendTicketWhatsAppAction(form: FormData) {
   redirect(url);
 }
 
+export async function sendApprovedTicketsWhatsAppAction(form: FormData) {
+  const token = text(form, 'token');
+  if (!token || token.length > 128) redirect('/admin/login');
+  const transaction = await prisma.transaction.findUnique({
+    where: { verifyToken: token },
+    include: { customer: true, event: true, items: { include: { product: true } }, tickets: { orderBy: { serial: 'asc' } } },
+  });
+  if (!transaction || transaction.status !== 'PAID' || transaction.tickets.length === 0) redirect('/admin/login');
+
+  const requestHeaders = await headers();
+  const host = requestHeaders.get('x-forwarded-host') || requestHeaders.get('host');
+  const protocol = requestHeaders.get('x-forwarded-proto')?.split(',')[0]?.trim() || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const baseUrl = appUrl(host ? `${protocol}://${host}` : undefined);
+  const ticketLinks = transaction.tickets.map((ticket, index) => `${index + 1}. ${ticket.ticketCode}\n${baseUrl}/ticket/${ticket.ticketCode}`).join('\n');
+  const productSummary = transaction.items.map((item) => `${item.product.name} × ${item.quantity}`).join(', ');
+  const message = `Halo ${transaction.customer.name}, pembayaran Anda berhasil.\n\nInvoice: ${transaction.invoice}\nEvent: ${transaction.event.name}\nTiket: ${productSummary}\n\nTiket digital Anda:\n${ticketLinks}\n\nTunjukkan QR tiket saat masuk event. Terima kasih telah bergabung dengan REGGAEPHORIA TANGSEL!`;
+
+  await prisma.whatsappLog.create({ data: { transactionId: transaction.id, phone: transaction.customer.whatsapp, message } });
+  revalidatePath('/admin/orders');
+  redirect(`https://wa.me/${transaction.customer.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`);
+}
+
 export async function cancelOrderAction(form: FormData) {
   const session = await getSession();
   if (!session || session.role !== 'ADMIN') redirect('/admin/login');
