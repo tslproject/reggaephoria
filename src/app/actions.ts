@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/prisma';
@@ -230,7 +231,11 @@ export async function sendTicketWhatsAppAction(form: FormData) {
   const transactionId = text(form, 'transactionId');
   const transaction = await prisma.transaction.findUnique({ where: { id: transactionId }, include: { customer: true, tickets: true } });
   if (!transaction || transaction.status !== 'PAID') return;
-  const message = `Halo ${transaction.customer.name}, pembayaran Anda berhasil.\n\nTiket digital Anda:\n${transaction.tickets.map((ticket) => `${appUrl()}/ticket/${ticket.ticketCode}`).join('\n')}\n\nTunjukkan QR saat masuk event.`;
+  const requestHeaders = await headers();
+  const host = requestHeaders.get('x-forwarded-host') || requestHeaders.get('host');
+  const protocol = requestHeaders.get('x-forwarded-proto')?.split(',')[0]?.trim() || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const baseUrl = appUrl(host ? `${protocol}://${host}` : undefined);
+  const message = `Halo ${transaction.customer.name}, pembayaran Anda berhasil.\n\nTiket digital Anda:\n${transaction.tickets.map((ticket) => `${baseUrl}/ticket/${ticket.ticketCode}`).join('\n')}\n\nTunjukkan QR saat masuk event.`;
   await prisma.whatsappLog.create({ data: { transactionId, phone: transaction.customer.whatsapp, message } });
   const url = `https://wa.me/${transaction.customer.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
   redirect(url);
