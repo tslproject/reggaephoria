@@ -1,0 +1,145 @@
+// ==========================================
+// REGGAE SENANG TIX - PRISMA DATABASE SCHEMA
+// Configured for Neon PostgreSQL & Vercel
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model TicketProduct {
+  id               String   @id @default(cuid())
+  name             String   // e.g. "VIP SENANG", "REGULER FESTIVAL"
+  price            Int      // Harga dalam Rupiah (e.g. 150000)
+  quota            Int      // Total kuota tiket (e.g. 500)
+  available        Int      // Sisa kuota tersedia
+  eventTitle       String   @default("Reggae Senang Festival 2026")
+  date             String   @default("Sabtu, 14 November 2026")
+  time             String   @default("16:00 - 23:30 WIB")
+  venue            String   @default("Pantai Karnaval Ancol")
+  city             String   @default("Jakarta Utara")
+  imageUrl         String   @db.Text
+  description      String   @db.Text
+  perks            String[] @default(["Akses Area Festival", "Wristband Hologram", "Akses Kuliner"])
+  approvalPassword String   // Password persetujuan transaksi khusus tiket ini
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  orders           Order[]
+
+  @@map("ticket_products")
+}
+
+model Order {
+  id                       String           @id // Invoice code format: RST-YYYYMMDD-NOMOR (e.g. RST-20260928-00001)
+  invoice                  String           @unique
+  verifyToken              String           @unique // Unique short token e.g. "a82jd92kq"
+  productId                String
+  productName              String
+  eventTitle               String
+  quantity                 Int
+  unitPrice                Int
+  uniqueCode               Int              // 3-digit kode unik (e.g. 142)
+  subtotal                 Int
+  totalAmount              Int
+  paymentMethod            String           // "DANA" | "BCA"
+  paymentProofUrl          String?          @db.Text
+  status                   String           @default("pending_approval") // "pending_approval" | "approved" | "rejected"
+  approvalPasswordRequired String
+  rejectionReason          String?
+  
+  // Buyer data
+  buyerName                String
+  buyerWhatsapp            String
+  buyerEmail               String
+  buyerIdNumber            String?
+
+  // Flags
+  waAdminNotificationSent  Boolean          @default(false)
+  waAdminSentAt            DateTime?
+  waBuyerDispatched        Boolean          @default(false)
+  waBuyerDispatchedAt      DateTime?
+
+  approvedAt               DateTime?
+  approvedBy               String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  product                  TicketProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tickets                  AttendeeTicket[]
+  deliveryLogs             DeliveryLog[]
+
+  @@index([buyerWhatsapp])
+  @@index([status])
+  @@map("orders")
+}
+
+model AttendeeTicket {
+  id            String    @id @default(cuid())
+  orderId       String
+  ticketCode    String    @unique // Format: RST-TICKET-0000001
+  barcode       String    // Barcode value (same as ticketCode)
+  attendeeName  String
+  buyerName     String
+  buyerWhatsapp String
+  productName   String
+  tierName      String?
+  eventTitle    String
+  date          String
+  time          String
+  venue         String
+  city          String
+  price         Int
+  status        String    @default("UNUSED") // "UNUSED" | "USED"
+  isUsed        Boolean   @default(false)
+  usedAt        DateTime?
+  usedByStaff   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketCode])
+  @@index([orderId])
+  @@map("attendee_tickets")
+}
+
+model GateScanRecord {
+  id           String   @id @default(cuid())
+  ticketCode   String
+  orderId      String?
+  status       String   // "VALID" | "ALREADY_USED" | "INVALID"
+  attendeeName String?
+  productName  String?
+  tierName     String?
+  message      String
+  staffName    String?
+  scannedAt    DateTime @default(now())
+
+  @@index([ticketCode])
+  @@index([scannedAt])
+  @@map("gate_scan_records")
+}
+
+model DeliveryLog {
+  id             String   @id @default(cuid())
+  orderId        String
+  ticketCode     String
+  recipientName  String
+  recipientPhone String
+  channel        String   @default("WHATSAPP")
+  status         String   @default("SENT") // "SENT" | "PENDING" | "FAILED"
+  ticketUrl      String
+  timestamp      DateTime @default(now())
+
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("delivery_logs")
+}
