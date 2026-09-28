@@ -1,67 +1,40 @@
-# REGGAE SENANG TIX 🌴🎟️
-> **Digital Ticket Management & Gate Scanner System**  
-> Neo-Brutalism Reggae Theme (Black, Red, Yellow, Green)
+# REGGAEPHORIA TANGSEL
 
-Aplikasi pemesanan tiket festival musik digital berbasis web dengan sistem approval password per tiket, barcode unik, notifikasi WhatsApp otomatis, dan scanner kamera gate masuk.
+Production-oriented digital ticketing application built with Next.js 15 App Router, TypeScript, Tailwind CSS, Prisma 6, and PostgreSQL (Neon).
 
----
+## Features
 
-## 🚀 Fitur Utama
+- Public event and ticket catalog backed by PostgreSQL
+- Customer checkout with inventory/quota validation and optional promotions
+- Manual DANA/BCA transfer instructions and logged `wa.me` payment confirmation
+- Password-protected payment approval, unique digital QR tickets, and WhatsApp delivery
+- Ticket recovery by customer WhatsApp number
+- Authenticated gate QR scanner with atomic check-in and scan history
+- Admin event, ticket product, staff, order, and reporting pages
+- Hashed admin/product passwords and signed HttpOnly staff sessions
 
-- **Halaman Pembeli Terpisah**:
-  - Katalog tiket dinamis (hanya tampil jika tiket dibuat oleh admin).
-  - Formulir pemesanan lengkap (Nama KTP, WhatsApp, Email, NIK/KTP, nama pemegang tiket).
-  - Pembayaran manual via **DANA (088210516736)** dan **BCA (6760633851)** dengan 3-digit kode unik verifikasi.
-  - Upload screenshot bukti transfer.
-  - Konfirmasi WhatsApp instan ke Admin dengan link approval langsung.
-- **Halaman Cek Tiket (`/?view=check`)**:
-  - Pelacakan dan unduh ulang e-tiket yang hilang hanya dengan nomor WhatsApp atau nomor invoice.
-- **Portal Admin Terproteksi (`/rsadmin`)**:
-  - Dilindungi login password: `reggaesenang`.
-  - **Manajemen Tiket**: Buat tiket baru, upload gambar poster, harga, kuota, dan **Password Persetujuan Transaksi Khusus Tiket**.
-  - **Approval Transaksi**: Verifikasi screenshot struk dengan input sandi persetujuan tiket.
-  - **Kirim Tiket WhatsApp**: Pengiriman e-tiket barcode & QR code langsung ke nomor WhatsApp pembeli.
-- **Gate Scanner Masuk (`/rsadmin` -> Gate Scanner)**:
-  - Scanner QR kamera browser langsung (menggunakan `jsqr`).
-  - Audio beep feedback harmonis: Chime hijau (Valid), Double-buzz kuning (Sudah Digunakan), Buzzer merah (Tidak Valid).
-  - Counter pengunjung *real-time* (Total Tiket, Check-in, Sisa Masuk).
-  - Alternatif input manual dan upload gambar QR.
+## Local setup
 
----
+1. Install Node.js 20+ and dependencies with `npm install`.
+2. Copy `.env.example` to `.env` and enter real Neon values. The existing `.env` in this workspace contains placeholder credentials and cannot connect to a database.
+3. Run `npx prisma generate`.
+4. Apply the committed initial migration with `npm run prisma:deploy`.
+5. Create the initial admin with `npm run seed` (default `admin` / `admin12345`; override `SEED_ADMIN_PASSWORD` before seeding, then change the password policy/credential before production use).
+6. Start with `npm run dev`.
 
-## 🛠️ Tech Stack & Database
+The app runs at `http://localhost:3000`. Admin login is `/admin/login`; the gate scanner is `/gate` and requires an authenticated staff account. The seed creates the first admin only; admins can create gate staff under `/admin/staff`.
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Motion, Lucide Icons, Canvas Confetti
-- **QR & Barcode**: QRCode, jsQR (Real-time camera scanner), SVG 1D Barcode
-- **Database**: **Neon PostgreSQL** (Serverless Cloud Postgres)
-- **ORM**: **Prisma ORM** v5
-- **Hosting & Deployment**: **Vercel**
+## Useful commands
 
----
+- `npm run lint` — TypeScript validation
+- `npm run build` — production build
+- `npx prisma validate` — validate Prisma schema
+- `npx prisma migrate dev --name <name>` — create/apply development migration
+- `npm run prisma:deploy` — apply committed migrations in production
+- `npm run seed` — ensure the initial admin exists
 
-## 📖 Panduan Deployment
+## Vercel + Neon
 
-Panduan langkah-demi-langkah dari pembuatan database di **Neon**, konfigurasi **Prisma**, hingga hosting di **Vercel** via **GitHub** tersedia lengkap di file:
-👉 **[DEPLOYMENT_TUTORIAL.md](./DEPLOYMENT_TUTORIAL.md)**
+Set `DATABASE_URL` to Neon’s pooled PostgreSQL URL and `DIRECT_URL` to the direct URL. Also configure `NEXT_PUBLIC_APP_URL`, `ADMIN_WHATSAPP`, and a random `SESSION_SECRET` of at least 32 characters. Apply committed Prisma migrations with `npm run prisma:deploy` as a release step before routing traffic; Vercel runs `npm run build` for the Next.js production build. See [DEPLOYMENT_TUTORIAL.md](./DEPLOYMENT_TUTORIAL.md) for detail.
 
-### Quick Start Lokal:
-
-```bash
-# 1. Install dependensi
-npm install --legacy-peer-deps
-
-# 2. Salin environment variable
-cp .env.example .env
-# Edit .env dan masukkan DATABASE_URL dari console.neon.tech
-
-# 3. Sinkronkan skema database ke Neon
-npx prisma generate
-npx prisma db push
-
-# 4. Jalankan dev server
-npm run dev
-```
-
-Buka browser di `http://localhost:3000`.
-- Halaman Pembeli: `http://localhost:3000/`
-- Halaman Admin: `http://localhost:3000/rsadmin` (Password: `reggaesenang`)
+Never commit `.env` or use the default admin password in a production deployment. No ticket/order persistence uses browser localStorage.

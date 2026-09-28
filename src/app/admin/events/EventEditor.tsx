@@ -1,0 +1,6 @@
+import { updateEventAction } from '@/src/app/actions';
+import ActionForm from '@/src/app/components/ActionForm';
+
+export default function EventEditor({ event }: { event: { id: string; name: string; description: string; location: string; eventDate: Date; banner: string | null } }) {
+  return <details className="mt-4"><summary className="cursor-pointer text-sm text-[#d8ff45]">Edit event</summary><div className="mt-4"><ActionForm action={updateEventAction} submitLabel="Simpan perubahan"><input type="hidden" name="id" value={event.id}/><label className="grid gap-2 text-sm">Nama<input name="name" defaultValue={event.name} required/></label><label className="grid gap-2 text-sm">Deskripsi<textarea name="description" defaultValue={event.description} rows={3} required/></label><label className="grid gap-2 text-sm">Lokasi<input name="location" defaultValue={event.location} required/></label><label className="grid gap-2 text-sm">Tanggal<input name="eventDate" type="datetime-local" defaultValue={new Date(event.eventDate.getTime() - event.eventDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16)} required/></label><label className="grid gap-2 text-sm">Banner URL<input name="banner" type="url" defaultValue={event.banner ?? ''}/></label></ActionForm></div></details>;
+}

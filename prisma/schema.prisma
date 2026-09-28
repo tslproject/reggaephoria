@@ -1,8 +1,3 @@
-// ==========================================
-// REGGAE SENANG TIX - PRISMA DATABASE SCHEMA
-// Configured for Neon PostgreSQL & Vercel
-// ==========================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,133 +8,152 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum AdminRole {
+  ADMIN
+  GATE_STAFF
+}
+
+enum TransactionStatus {
+  WAITING_PAYMENT
+  PAID
+  CANCELLED
+}
+
+enum TicketStatus {
+  UNUSED
+  USED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  createdAt    DateTime  @default(now())
+  scans        ScanLog[]
+}
+
+model Event {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  description  String           @db.Text
+  banner       String?
+  location     String
+  eventDate    DateTime
+  createdAt    DateTime         @default(now())
+  products     TicketProduct[]
+  transactions Transaction[]
+}
+
 model TicketProduct {
-  id               String   @id @default(cuid())
-  name             String   // e.g. "VIP SENANG", "REGULER FESTIVAL"
-  price            Int      // Harga dalam Rupiah (e.g. 150000)
-  quota            Int      // Total kuota tiket (e.g. 500)
-  available        Int      // Sisa kuota tersedia
-  eventTitle       String   @default("Reggae Senang Festival 2026")
-  date             String   @default("Sabtu, 14 November 2026")
-  time             String   @default("16:00 - 23:30 WIB")
-  venue            String   @default("Pantai Karnaval Ancol")
-  city             String   @default("Jakarta Utara")
-  imageUrl         String   @db.Text
-  description      String   @db.Text
-  perks            String[] @default(["Akses Area Festival", "Wristband Hologram", "Akses Kuliner"])
-  approvalPassword String   // Password persetujuan transaksi khusus tiket ini
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  orders           Order[]
-
-  @@map("ticket_products")
+  id                   String            @id @default(cuid())
+  eventId              String
+  event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String?           @db.Text
+  imageData            Bytes?            @db.ByteA
+  imageMimeType        String?
+  price                Int
+  quota                Int
+  approvalPasswordHash String
+  active               Boolean           @default(true)
+  createdAt            DateTime          @default(now())
+  transactionItems     TransactionItem[]
 }
 
-model Order {
-  id                       String           @id // Invoice code format: RST-YYYYMMDD-NOMOR (e.g. RST-20260928-00001)
-  invoice                  String           @unique
-  verifyToken              String           @unique // Unique short token e.g. "a82jd92kq"
-  productId                String
-  productName              String
-  eventTitle               String
-  quantity                 Int
-  unitPrice                Int
-  uniqueCode               Int              // 3-digit kode unik (e.g. 142)
-  subtotal                 Int
-  totalAmount              Int
-  paymentMethod            String           // "DANA" | "BCA"
-  paymentProofUrl          String?          @db.Text
-  status                   String           @default("pending_approval") // "pending_approval" | "approved" | "rejected"
-  approvalPasswordRequired String
-  rejectionReason          String?
-  
-  // Buyer data
-  buyerName                String
-  buyerWhatsapp            String
-  buyerEmail               String
-  buyerIdNumber            String?
-
-  // Flags
-  waAdminNotificationSent  Boolean          @default(false)
-  waAdminSentAt            DateTime?
-  waBuyerDispatched        Boolean          @default(false)
-  waBuyerDispatchedAt      DateTime?
-
-  approvedAt               DateTime?
-  approvedBy               String?
-  createdAt                DateTime         @default(now())
-  updatedAt                DateTime         @updatedAt
-
-  product                  TicketProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tickets                  AttendeeTicket[]
-  deliveryLogs             DeliveryLog[]
-
-  @@index([buyerWhatsapp])
-  @@index([status])
-  @@map("orders")
+model Promo {
+  id            String       @id @default(cuid())
+  name          String
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Int
+  startDate     DateTime
+  endDate       DateTime
+  active        Boolean      @default(true)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
 }
 
-model AttendeeTicket {
-  id            String    @id @default(cuid())
-  orderId       String
-  ticketCode    String    @unique // Format: RST-TICKET-0000001
-  barcode       String    // Barcode value (same as ticketCode)
-  attendeeName  String
-  buyerName     String
-  buyerWhatsapp String
-  productName   String
-  tierName      String?
-  eventTitle    String
-  date          String
-  time          String
-  venue         String
-  city          String
-  price         Int
-  status        String    @default("UNUSED") // "UNUSED" | "USED"
-  isUsed        Boolean   @default(false)
-  usedAt        DateTime?
-  usedByStaff   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([ticketCode])
-  @@index([orderId])
-  @@map("attendee_tickets")
+model Customer {
+  id           String        @id @default(cuid())
+  name         String
+  whatsapp     String
+  email        String?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  @@index([whatsapp])
 }
 
-model GateScanRecord {
-  id           String   @id @default(cuid())
-  ticketCode   String
-  orderId      String?
-  status       String   // "VALID" | "ALREADY_USED" | "INVALID"
-  attendeeName String?
-  productName  String?
-  tierName     String?
-  message      String
-  staffName    String?
-  scannedAt    DateTime @default(now())
-
-  @@index([ticketCode])
-  @@index([scannedAt])
-  @@map("gate_scan_records")
+model Transaction {
+  id           String            @id @default(cuid())
+  invoice      String            @unique
+  customerId   String
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  eventId      String
+  event        Event             @relation(fields: [eventId], references: [id])
+  promoId      String?
+  promo        Promo?            @relation(fields: [promoId], references: [id])
+  total        Int
+  status       TransactionStatus @default(WAITING_PAYMENT)
+  verifyToken  String            @unique @default(cuid())
+  createdAt    DateTime          @default(now())
+  items        TransactionItem[]
+  tickets      Ticket[]
+  paymentLogs  PaymentLog[]
+  whatsappLogs WhatsappLog[]
 }
 
-model DeliveryLog {
-  id             String   @id @default(cuid())
-  orderId        String
-  ticketCode     String
-  recipientName  String
-  recipientPhone String
-  channel        String   @default("WHATSAPP")
-  status         String   @default("SENT") // "SENT" | "PENDING" | "FAILED"
-  ticketUrl      String
-  timestamp      DateTime @default(now())
+model TransactionItem {
+  id            String        @id @default(cuid())
+  transactionId String
+  transaction   Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  productId     String
+  product       TicketProduct @relation(fields: [productId], references: [id])
+  quantity      Int
+  unitPrice     Int
+}
 
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+model Ticket {
+  id            String       @id @default(cuid())
+  serial        Int          @unique @default(autoincrement())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  ticketCode    String       @unique
+  qrData        String
+  status        TicketStatus @default(UNUSED)
+  createdAt     DateTime     @default(now())
+  scanLogs      ScanLog[]
+}
 
-  @@index([orderId])
-  @@map("delivery_logs")
+model PaymentLog {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  action        String
+  createdAt     DateTime    @default(now())
+}
+
+model WhatsappLog {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  phone         String
+  message       String      @db.Text
+  createdAt     DateTime    @default(now())
+}
+
+model ScanLog {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  staffId   String?
+  staff     Admin?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  result    String
+  createdAt DateTime @default(now())
 }
