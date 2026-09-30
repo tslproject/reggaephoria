@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { requireAdmin } from '@/src/lib/auth';
 import { prisma } from '@/src/lib/prisma';
 import { rupiah } from '@/src/lib/format';
 import ActionForm from '@/src/app/components/ActionForm';
@@ -6,6 +7,7 @@ import { approvePaymentAction, sendApprovedTicketsWhatsAppAction } from '@/src/a
 
 export const dynamic = 'force-dynamic';
 export default async function ApprovalPage({ params }: { params: Promise<{ token: string }> }) {
+  await requireAdmin();
   const { token } = await params;
   const order = await prisma.transaction.findUnique({ where: { verifyToken: token }, include: { customer: true, event: true, items: { include: { product: true } }, tickets: true } });
   if (!order) notFound();

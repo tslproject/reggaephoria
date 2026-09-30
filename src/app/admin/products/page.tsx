@@ -31,8 +31,8 @@ export default async function ProductsPage() {
         <label className="grid gap-2 text-sm">Kode promo<input name="code" required/></label>
         <label className="grid gap-2 text-sm">Jenis diskon<select name="discountType"><option value="PERCENTAGE">Persentase</option><option value="FIXED">Nominal rupiah</option></select></label>
         <label className="grid gap-2 text-sm">Nilai<input name="discountValue" type="number" min="1" required/></label>
-        <label className="grid gap-2 text-sm">Mulai<input name="startDate" type="datetime-local" required/></label>
-        <label className="grid gap-2 text-sm">Berakhir<input name="endDate" type="datetime-local" required/></label>
+        <label className="grid gap-2 text-sm">Mulai (WIB)<input name="startDate" type="datetime-local" required/></label>
+        <label className="grid gap-2 text-sm">Berakhir (WIB)<input name="endDate" type="datetime-local" required/></label>
       </ActionForm></div>
     </section>
     <section className="space-y-4">

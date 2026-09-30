@@ -6,14 +6,28 @@ import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/prisma';
-import { clearSession, getSession, setSession } from '@/src/lib/auth';
-import { appUrl } from '@/src/lib/format';
+import { clearSession, getSession, requireAdmin, setSession } from '@/src/lib/auth';
+import { appUrl, parseJakartaDateTimeLocal } from '@/src/lib/format';
 import { nextInvoice } from '@/src/lib/invoice';
 import { randomBytes } from 'node:crypto';
 
 export type ActionState = { error?: string; success?: string };
 const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
 const integer = (form: FormData, key: string) => Number.parseInt(text(form, key), 10);
+
+function parseBannerUrls(value: FormDataEntryValue | null) {
+  const urls = String(value ?? '').split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+  if (urls.length > 10 || urls.some((url) => url.length > 2048)) return null;
+  for (const url of urls) {
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    } catch {
+      return null;
+    }
+  }
+  return [...new Set(urls)];
+}
 
 async function parseProductImage(value: FormDataEntryValue | null) {
   if (!(value instanceof File) || value.size === 0) return null;
@@ -46,10 +60,11 @@ export async function createEventAction(_: ActionState, form: FormData): Promise
   if (!session || session.role !== 'ADMIN') return { error: 'Akses admin diperlukan.' };
   const name = text(form, 'name');
   const slug = text(form, 'slug').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
-  const eventDate = new Date(text(form, 'eventDate'));
-  if (!name || !slug || !text(form, 'location') || Number.isNaN(eventDate.getTime())) return { error: 'Lengkapi data event dengan benar.' };
+  const eventDate = parseJakartaDateTimeLocal(text(form, 'eventDate'));
+  const banners = parseBannerUrls(form.get('banners'));
+  if (!name || !slug || !text(form, 'location') || !eventDate || !banners) return { error: 'Lengkapi data event dengan benar dan pastikan setiap banner memakai URL HTTP/HTTPS.' };
   try {
-    await prisma.event.create({ data: { name, slug, description: text(form, 'description'), banner: text(form, 'banner') || null, location: text(form, 'location'), eventDate } });
+    await prisma.event.create({ data: { name, slug, description: text(form, 'description'), banners, location: text(form, 'location'), eventDate } });
   } catch { return { error: 'Slug sudah digunakan atau data event tidak valid.' }; }
   revalidatePath('/'); revalidatePath('/admin/events');
   return { success: 'Event berhasil dibuat.' };
@@ -61,10 +76,11 @@ export async function updateEventAction(_: ActionState, form: FormData): Promise
   const id = text(form, 'id');
   const name = text(form, 'name');
   const location = text(form, 'location');
-  const eventDate = new Date(text(form, 'eventDate'));
-  if (!id || name.length < 2 || !location || Number.isNaN(eventDate.getTime())) return { error: 'Data event tidak valid.' };
+  const eventDate = parseJakartaDateTimeLocal(text(form, 'eventDate'));
+  const banners = parseBannerUrls(form.get('banners'));
+  if (!id || name.length < 2 || !location || !eventDate || !banners) return { error: 'Data event tidak valid. Pastikan setiap banner memakai URL HTTP/HTTPS.' };
   try {
-    await prisma.event.update({ where: { id }, data: { name, description: text(form, 'description'), location, eventDate, banner: text(form, 'banner') || null } });
+    await prisma.event.update({ where: { id }, data: { name, description: text(form, 'description'), location, eventDate, banners } });
   } catch { return { error: 'Event tidak dapat diperbarui.' }; }
   revalidatePath('/'); revalidatePath('/admin/events');
   return { success: 'Event diperbarui.' };
@@ -122,9 +138,9 @@ export async function createPromoAction(_: ActionState, form: FormData): Promise
   const code = text(form, 'code').toUpperCase().replace(/[^A-Z0-9-]/g, '');
   const discountType = text(form, 'discountType');
   const discountValue = integer(form, 'discountValue');
-  const startDate = new Date(text(form, 'startDate'));
-  const endDate = new Date(text(form, 'endDate'));
-  if (!name || !code || !['PERCENTAGE', 'FIXED'].includes(discountType) || !Number.isSafeInteger(discountValue) || discountValue < 1 || (discountType === 'PERCENTAGE' && discountValue > 100) || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) return { error: 'Periksa kembali data promo.' };
+  const startDate = parseJakartaDateTimeLocal(text(form, 'startDate'));
+  const endDate = parseJakartaDateTimeLocal(text(form, 'endDate'));
+  if (!name || name.length > 120 || !code || code.length > 32 || !['PERCENTAGE', 'FIXED'].includes(discountType) || !Number.isSafeInteger(discountValue) || discountValue < 1 || (discountType === 'PERCENTAGE' && discountValue > 100) || !startDate || !endDate || endDate <= startDate) return { error: 'Periksa kembali data promo.' };
   try {
     await prisma.promo.create({ data: { name, code, discountType: discountType as 'PERCENTAGE' | 'FIXED', discountValue, startDate, endDate } });
   } catch { return { error: 'Kode promo sudah digunakan.' }; }
@@ -165,6 +181,7 @@ export async function createOrderAction(_: ActionState, form: FormData): Promise
       const customer = await tx.customer.create({ data: { name, whatsapp, email: email || null } });
       const promoCode = text(form, 'promoCode').toUpperCase();
       const promo = promoCode ? await tx.promo.findFirst({ where: { code: promoCode, active: true, startDate: { lte: new Date() }, endDate: { gte: new Date() } } }) : null;
+      if (promoCode && !promo) throw new Error('Kode promo tidak valid atau sudah kedaluwarsa.');
       const subtotal = currentProduct.price * quantity;
       const discount = !promo ? 0 : promo.discountType === 'PERCENTAGE' ? Math.floor(subtotal * promo.discountValue / 100) : promo.discountValue;
       return tx.transaction.create({ data: {
@@ -179,11 +196,13 @@ export async function createOrderAction(_: ActionState, form: FormData): Promise
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof Error && error.message.includes('Kuota')) return { error: error.message };
     if (error instanceof Error && error.message.includes('Produk tiket')) return { error: error.message };
+    if (error instanceof Error && error.message.includes('Kode promo')) return { error: error.message };
     return { error: 'Pesanan belum dapat dibuat. Silakan coba kembali.' };
   }
 }
 
 export async function approvePaymentAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
   const token = text(form, 'token');
   const password = text(form, 'approvalPassword');
   const transaction = await prisma.transaction.findUnique({ where: { verifyToken: token }, include: { items: { include: { product: true } }, tickets: true } });
@@ -192,18 +211,19 @@ export async function approvePaymentAction(_: ActionState, form: FormData): Prom
   if (transaction.status !== 'WAITING_PAYMENT' || !transaction.items.length) return { error: 'Transaksi tidak menunggu pembayaran.' };
   if (!(await bcrypt.compare(password, transaction.items[0].product.approvalPasswordHash))) return { error: 'Password approval produk salah.' };
   try {
-    await prisma.$transaction(async (tx) => {
+    const issued = await prisma.$transaction(async (tx) => {
       const updated = await tx.transaction.updateMany({ where: { id: transaction.id, status: 'WAITING_PAYMENT' }, data: { status: 'PAID' } });
-      if (!updated.count) return;
+      if (!updated.count) return false;
       await tx.paymentLog.create({ data: { transactionId: transaction.id, action: 'PAYMENT_APPROVED' } });
       for (const item of transaction.items) {
         for (let index = 0; index < item.quantity; index++) {
-          const ticket = await tx.ticket.create({ data: { transactionId: transaction.id, ticketCode: `PENDING-${crypto.randomUUID()}`, qrData: 'pending' } });
-          const ticketCode = `RGT-TICKET-${String(ticket.serial).padStart(6, '0')}`;
-          await tx.ticket.update({ where: { id: ticket.id }, data: { ticketCode, qrData: ticketCode } });
+          const ticketCode = `RGT-TICKET-${randomBytes(16).toString('hex').toUpperCase()}`;
+          await tx.ticket.create({ data: { transactionId: transaction.id, ticketCode, qrData: ticketCode } });
         }
       }
+      return true;
     });
+    if (!issued) return { error: 'Transaksi sudah berubah status. Muat ulang halaman.' };
   } catch { return { error: 'Persetujuan gagal disimpan. Coba ulangi.' }; }
   revalidatePath('/admin/orders'); revalidatePath(`/approval/${token}`);
   return { success: 'Pembayaran disetujui dan tiket digital telah diterbitkan.' };
@@ -242,6 +262,7 @@ export async function sendTicketWhatsAppAction(form: FormData) {
 }
 
 export async function sendApprovedTicketsWhatsAppAction(form: FormData) {
+  await requireAdmin();
   const token = text(form, 'token');
   if (!token || token.length > 128) redirect('/admin/login');
   const transaction = await prisma.transaction.findUnique({

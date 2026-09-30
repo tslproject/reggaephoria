@@ -43,7 +43,7 @@ model Event {
   name         String
   slug         String           @unique
   description  String           @db.Text
-  banner       String?
+  banners      String[]         @default([])
   location     String
   eventDate    DateTime
   createdAt    DateTime         @default(now())

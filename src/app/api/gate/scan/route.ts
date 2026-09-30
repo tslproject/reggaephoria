@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   let data: { ticketCode?: string; checkIn?: boolean };
   try { data = await request.json(); } catch { return NextResponse.json({ result: 'INVALID_REQUEST' }, { status: 400 }); }
   const code = String(data.ticketCode ?? '').trim();
-  if (!/^RGT-TICKET-\d{6,}$/.test(code)) return NextResponse.json({ result: 'INVALID' });
+  if (!/^RGT-TICKET-(?:\d{6,}|[A-F0-9]{32})$/.test(code)) return NextResponse.json({ result: 'INVALID' });
   const ticket = await prisma.ticket.findUnique({ where: { ticketCode: code }, include: { transaction: { include: { customer: true, event: true, items: { include: { product: true } } } } } });
   if (!ticket || ticket.transaction.status !== 'PAID') return NextResponse.json({ result: 'INVALID' });
   if (ticket.status === 'USED') {

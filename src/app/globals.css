@@ -60,7 +60,28 @@ hr { border-color: var(--line); }
 /* Brash headings, separators, and controls */
 h1, h2, h3 { overflow-wrap: anywhere; }
 h1 { font-size: clamp(1.9rem, 6vw, 3rem); line-height: 1.08; }
-.hero-title { font-size: clamp(1.7rem, 8.8vw, 5.6rem); line-height: .98; overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.hero-title { font-size: clamp(1.7rem, 4.5vw, 3.5rem); line-height: .98; overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.beach-scene-wrap { position: relative; align-self: center; min-width: 0; overflow: hidden; border: 2px solid #090a08; border-radius: 1rem; background: #173d32; box-shadow: 6px 6px 0 var(--yellow); }
+.beach-scene { display: block; width: 100%; height: auto; }
+.beach-scene-caption { position: absolute; right: .65rem; bottom: .65rem; display: inline-flex; align-items: center; gap: .5rem; border: 1px solid rgb(255 255 255 / 25%); border-radius: 999px; padding: .4rem .7rem; background: rgb(13 31 25 / 78%); color: #fff4ce; font-size: .65rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; backdrop-filter: blur(8px); }
+.beach-equalizer { display: flex; align-items: center; gap: 2px; height: 15px; }
+.beach-equalizer i { width: 3px; height: 7px; border-radius: 2px; background: var(--yellow); animation: beach-equalize .7s ease-in-out infinite alternate; }
+.beach-equalizer i:nth-child(2) { height: 12px; background: var(--red); animation-delay: -.25s; }
+.beach-equalizer i:nth-child(3) { height: 9px; background: var(--green); animation-delay: -.5s; }
+.beach-equalizer i:nth-child(4) { height: 13px; background: var(--yellow); animation-delay: -.35s; }
+.beach-equalizer i:nth-child(5) { height: 6px; background: var(--red); animation-delay: -.1s; }
+.beach-sun { transform-box: fill-box; transform-origin: center; animation: beach-sun-pulse 4s ease-in-out infinite; }
+.beach-palm { transform-box: fill-box; transform-origin: 50% 100%; animation: beach-palm-sway 5s ease-in-out infinite alternate; }
+.beach-cloud { animation: beach-cloud-drift 18s ease-in-out infinite alternate; }
+.beach-wave { stroke-dasharray: 22 16; animation: beach-wave-flow 8s linear infinite; }
+.beach-wave-front { animation-duration: 11s; animation-direction: reverse; }
+.beach-note { transform-box: fill-box; transform-origin: center; animation: beach-note-float 3s ease-in-out infinite; }
+@keyframes beach-equalize { to { transform: scaleY(.45); } }
+@keyframes beach-sun-pulse { 50% { transform: scale(1.07); } }
+@keyframes beach-palm-sway { to { transform: rotate(2deg); } }
+@keyframes beach-cloud-drift { to { transform: translateX(26px); } }
+@keyframes beach-wave-flow { to { stroke-dashoffset: -152px; } }
+@keyframes beach-note-float { 50% { transform: translateY(-9px) rotate(7deg); } }
 [class~="text-[#d8ff45]"] { color: var(--yellow) !important; }
 [class~="bg-[#d8ff45]"] { background-color: var(--yellow) !important; }
 ::selection { color: var(--ink); background: var(--yellow); }
@@ -88,4 +109,5 @@ h1 { font-size: clamp(1.9rem, 6vw, 3rem); line-height: 1.08; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .beach-equalizer i, .beach-sun, .beach-palm, .beach-cloud, .beach-wave, .beach-note { animation: none !important; }
 }

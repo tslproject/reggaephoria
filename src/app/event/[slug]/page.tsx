@@ -4,6 +4,7 @@ import { prisma } from '@/src/lib/prisma';
 import { rupiah } from '@/src/lib/format';
 import ActionForm from '@/src/app/components/ActionForm';
 import { createOrderAction } from '@/src/app/actions';
+import BannerSlideshow from '@/src/app/components/BannerSlideshow';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
     return { ...product, remaining: Math.max(0, product.quota - (sum._sum.quantity ?? 0)) };
   }));
   return <div className="mx-auto max-w-4xl space-y-8">
-    {event.banner && <img src={event.banner} alt={event.name} className="max-h-96 w-full rounded-lg border-2 border-black object-cover shadow-[6px_6px_0_#39b765]"/>}
+    <BannerSlideshow banners={event.banners} eventName={event.name}/>
     <header className="space-y-3"><p className="text-sm font-black uppercase tracking-[.2em] text-[#d8ff45]">REGGAEPHORIA TANGSEL</p><h1 className="text-4xl font-black">{event.name}</h1><p className="text-[#c0c1b5]">{event.eventDate.toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Asia/Jakarta' })} · {event.location}</p><p className="whitespace-pre-wrap text-[#d0d0c4]">{event.description}</p></header>
     <section className="space-y-4"><h2 className="text-2xl font-black">Pilih kategori tiket</h2>{available.length ? <div className="grid gap-4 sm:grid-cols-2">{available.map((product) => <article key={product.id} className="card space-y-3">
       {product.imageMimeType && <img src={`/api/products/${product.id}/image`} alt={product.name} className="h-40 w-full rounded-md border-2 border-black object-cover"/>}
